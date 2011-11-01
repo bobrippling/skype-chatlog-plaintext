@@ -24,11 +24,23 @@ E0 03 23 -- -- -- ...   2F 34 -- -- -- ...   3B
 */
 
 
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
-#include <setjmp.h>
-#include <stdlib.h>
+// C-Library
+#include <cstdio>
+#include <cerrno>
+#include <cstring>
+#include <csetjmp>
+#include <cstdlib>
+
+// C++-Library
+#include <iostream>
+
+// POSIX-Library
+#include <unistd.h>
+#include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 
 jmp_buf nul;
 
@@ -50,31 +62,6 @@ void die(const char *s)
 	exit(1);
 }
 
-void fget(FILE *f, char **buf, size_t *pos)
-{
-#define SINGLE 512
-	size_t len = SINGLE;
-	char *base = (char*) malloc(len);
-	char *tmp;
-
-	if(!base)
-		die("malloc()");
-
-	tmp = base;
-
-	while(fread(tmp, sizeof(char), SINGLE, f) > 0){
-		base = (char*) realloc(base, len += SINGLE);
-		if(!base)
-			die("malloc()");
-		tmp = base + len - SINGLE;
-	}
-
-	if(ferror(f))
-		die("read()");
-
-	*buf = base;
-	*pos = len - SINGLE;
-}
 
 char *memmem2(char *start, char *data, size_t len, int n)
 {
@@ -88,15 +75,11 @@ char *memmem2(char *start, char *data, size_t len, int n)
 	return pos + strlen((const char *)sections[n]);
 }
 
-int fprocess(FILE *f, const char *fname)
+int fprocess(char *data, size_t len)
 {
 	int ret = 0;
-	char *data;
 	char *ptr;
 	char *save;
-	size_t len;
-
-	fget(f, &data, &len);
 
 	ptr = data;
 
@@ -124,28 +107,38 @@ int fprocess(FILE *f, const char *fname)
 			ptr = (char*) memchr(ptr, 0, len - (ptr - data));
 			msg = save;
 
-			printf("%s: %s <-> %s: %s\n", fname, mem1, mem2, msg);
+			printf("%s <-> %s: %s\n", mem1, mem2, msg);
 		}while(1);
 	else
 		ret = 1;
-
-	free(data);
 
 	return ret;
 }
 
 int process(const char *fname)
 {
-	FILE *f = fopen(fname, "r");
-	int ret;
+    int fd = open(fname, O_RDONLY);
+    if (fd == -1)
+    {
+        perror("Failed to open file for reading");
+        return 1;
+    }
+    
+    off_t filesize = lseek(fd, 0, SEEK_END);
 
-	if(!f){
-		fprintf(stderr, "open: \"%s\": %s\n", fname, strerror(errno));
-		return 1;
-	}
+    void *buf = mmap(0, filesize, PROT_WRITE, MAP_PRIVATE, fd, 0);
+    if (buf == MAP_FAILED)
+    {
+        perror("Failed to memory-map file");
+        close(fd);
+        return 1;
+    }
+    
+    
+	int ret = fprocess(static_cast<char *>(buf), filesize);
 
-	ret = fprocess(f, fname);
-	fclose(f);
+    munmap(buf, filesize);
+    close(fd);
 
 	return ret;
 }
@@ -154,12 +147,21 @@ int main(int argc, char **argv)
 {
 	int ret = 0;
 
+#if 0
 	if(argc > 1){
 		int i;
 		for(i = 1; i < argc; i++)
 			ret |= process(argv[i]);
 	}else
 		ret = fprocess(stdin, "-");
+#endif
+    if(argc < 2)
+    {
+        std::cerr<<"No input file specified";
+        ret = 1;
+    }
+    for(size_t i = 1; i < argc; i++)
+			ret |= process(argv[i]);
 
 	return ret;
 }
