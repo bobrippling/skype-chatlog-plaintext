@@ -69,12 +69,6 @@ const unsigned char sections[][6] = {
 };
 
 
-void die(const char *s)
-{
-	perror(s);
-	exit(1);
-}
-
 
 char *find_section(char *start, char *data, size_t len, int n)
 {
