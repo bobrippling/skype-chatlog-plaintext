@@ -1,4 +1,27 @@
-/* http://www.ndmteam.com/en/node/30 */
+/* http://www.ndmteam.com/skype-chat-logs-dissection/ 
+
+6C 33 33 6C __ __ __ __ __ __ __ __ __ __ __ __ __ __
+E0 03 23 -- -- -- ...   2F 34 -- -- -- ...   3B
+         ^          ^
+         +----------+- name1  +----------+- name2
+
+1. Every record starts with byte sequence 0x6C 0x33 0x33 0x6C (l33l in ASCII)
+2. Next 14 bytes are there with unknown (at least for me) purpose
+3. 0xE0 0x03 – marker for the beginning of chat members field
+   first chat member username is prefixed with 0x23 (# in ASCII)
+   two chat members are separated with 0x2F (/ in ASCII)
+   the second chat member username is prefixed with 0x34 ($ in ASCII)
+   the list of chat members ends with 0x3B (; in ASCII)
+
+   Remark: I still have some problems with correct interpretation of this field for records with more then two chat members
+
+4. The bytes after 0x3B to the next described number are with unknown content
+5. 0xE5 0x03 – marker for the beginning of 6 bytes sequence, representing the message timestamp. The numbers in all chat logs are stored in little-endian format. The fifth and the sixth byte seems to be constant in all the records - 0x04 0x03. The sixth byte is not used in the actual timestamp calculations (for now ... may be it'll be used in further moment). Bytes 1st to 5th represent message timestamp in standard Unix format.Normally only 4 bytes of information are needed to store Unix timestamp. That's why first I thought that bytes 5th and 6th are not used at all. But after some calculations it came clear that first 4 bytes did not represent the actual time since 1/1/1970. It came clear also that the most significant bit in every of the first 4 bytes is always 1. That's why it seems logically to me to conclude that those bits are sign bits and that they shouldn't be used in actual timestamp calculations. Striping those most significant bits from every of the first 4 bytes and combining the rest of the bits it was received 28bit combination. For the standard Unix time representation 32 bits of information are needed, so we just 'lend' last 4 bits from 5th byte. This 32 bit combination gave the Unix timestamp of the chat message
+6. 0xE8 0x03 – marker for the beginning of the sender username field. The field ends with zero byte 0x00
+7. 1.0xEC 0x03 – marker for the beginning of the sender screen name field. The field ends with zero byte 0x00
+8. 1.0xFC 0x03 – marker for the beginning of the message field. The field ends with zero byte 0x00
+
+*/
 
 #define _GNU_SOURCE
 #include <stdio.h>
@@ -142,27 +165,3 @@ int main(int argc, char **argv)
 }
 
 
-#if 0
-
-6C 33 33 6C __ __ __ __ __ __ __ __ __ __ __ __ __ __
-E0 03 23 -- -- -- ...   2F 34 -- -- -- ...   3B
-         ^          ^
-         +----------+- name1  +----------+- name2
-
-1. Every record starts with byte sequence 0x6C 0x33 0x33 0x6C (l33l in ASCII)
-2. Next 14 bytes are there with unknown (at least for me) purpose
-3. 0xE0 0x03 – marker for the beginning of chat members field
-   first chat member username is prefixed with 0x23 (# in ASCII)
-   two chat members are separated with 0x2F (/ in ASCII)
-   the second chat member username is prefixed with 0x34 ($ in ASCII)
-   the list of chat members ends with 0x3B (; in ASCII)
-
-   Remark: I still have some problems with correct interpretation of this field for records with more then two chat members
-
-4. The bytes after 0x3B to the next described number are with unknown content
-5. 0xE5 0x03 – marker for the beginning of 6 bytes sequence, representing the message timestamp. The numbers in all chat logs are stored in little-endian format. The fifth and the sixth byte seems to be constant in all the records - 0x04 0x03. The sixth byte is not used in the actual timestamp calculations (for now ... may be it'll be used in further moment). Bytes 1st to 5th represent message timestamp in standard Unix format.Normally only 4 bytes of information are needed to store Unix timestamp. That's why first I thought that bytes 5th and 6th are not used at all. But after some calculations it came clear that first 4 bytes did not represent the actual time since 1/1/1970. It came clear also that the most significant bit in every of the first 4 bytes is always 1. That's why it seems logically to me to conclude that those bits are sign bits and that they shouldn't be used in actual timestamp calculations. Striping those most significant bits from every of the first 4 bytes and combining the rest of the bits it was received 28bit combination. For the standard Unix time representation 32 bits of information are needed, so we just 'lend' last 4 bits from 5th byte. This 32 bit combination gave the Unix timestamp of the chat message
-6. 0xE8 0x03 – marker for the beginning of the sender username field. The field ends with zero byte 0x00
-7. 1.0xEC 0x03 – marker for the beginning of the sender screen name field. The field ends with zero byte 0x00
-8. 1.0xFC 0x03 – marker for the beginning of the message field. The field ends with zero byte 0x00
-
-#endif
