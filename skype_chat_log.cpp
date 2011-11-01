@@ -46,6 +46,17 @@ jmp_buf nul;
 
 
 
+enum {
+    SEC_START_REC = 0,
+    SEC_START_CHAT,
+    SEC_START_SENDER,
+    SEC_MEM_SEP,
+    SEC_START_RECIPIENTS,
+    SEC_END_MEMBS,
+    SEC_START_MSG,
+    SEC_NUM_SECTIONS
+};
+
 const unsigned char sections[][6] = {
  /* start_rec  */  { 0x6C, 0x33, 0x33, 0x6C, 0x0 },
  /* // skip 14 */
@@ -89,22 +100,22 @@ int parse_data(char *data, size_t len)
 		do{
 			char *sender, *recipients, *msg;
 
-			ptr = find_section(ptr, data, len, 0);
+			ptr = find_section(ptr, data, len, SEC_START_REC);
 			ptr += 14;
-			ptr = find_section(ptr, data, len, 1);
-			ptr = find_section(ptr, data, len, 2);
+			ptr = find_section(ptr, data, len, SEC_START_CHAT);
+			ptr = find_section(ptr, data, len, SEC_START_SENDER);
 			save = ptr;
-			ptr = find_section(ptr, data, len, 3);
+			ptr = find_section(ptr, data, len, SEC_MEM_SEP);
 			ptr[-1] = '\0';
 			sender = save;
 
 			ptr++; /* = find_section(ptr - 1, data, len, 4); */
 			save = ptr;
-			ptr = find_section(ptr, data, len, 5);
+			ptr = find_section(ptr, data, len, SEC_END_MEMBS);
 			ptr[-1] = '\0';
 			recipients = save;
 
-			ptr = find_section(ptr, data, len, 6);
+			ptr = find_section(ptr, data, len, SEC_START_MSG);
 			save = ptr;
 			ptr = (char*) memchr(ptr, 0, len - (ptr - data));
 			msg = save;
