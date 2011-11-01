@@ -23,7 +23,7 @@ E0 03 23 -- -- -- ...   2F 34 -- -- -- ...   3B
 
 */
 
-#define _GNU_SOURCE
+
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
@@ -54,7 +54,7 @@ void fget(FILE *f, char **buf, size_t *pos)
 {
 #define SINGLE 512
 	size_t len = SINGLE;
-	char *base = malloc(len);
+	char *base = (char*) malloc(len);
 	char *tmp;
 
 	if(!base)
@@ -63,7 +63,7 @@ void fget(FILE *f, char **buf, size_t *pos)
 	tmp = base;
 
 	while(fread(tmp, sizeof(char), SINGLE, f) > 0){
-		base = realloc(base, len += SINGLE);
+		base = (char*) realloc(base, len += SINGLE);
 		if(!base)
 			die("malloc()");
 		tmp = base + len - SINGLE;
@@ -78,7 +78,7 @@ void fget(FILE *f, char **buf, size_t *pos)
 
 char *memmem2(char *start, char *data, size_t len, int n)
 {
-	char *pos = memmem(start, len - (start - data),
+	char *pos = (char*) memmem(start, len - (start - data),
 				sections[n],
 				strlen((const char *)sections[n]));
 
@@ -121,7 +121,7 @@ int fprocess(FILE *f, const char *fname)
 
 			ptr = memmem2(ptr, data, len, 6);
 			save = ptr;
-			ptr = memchr(ptr, 0, len - (ptr - data));
+			ptr = (char*) memchr(ptr, 0, len - (ptr - data));
 			msg = save;
 
 			printf("%s: %s <-> %s: %s\n", fname, mem1, mem2, msg);
