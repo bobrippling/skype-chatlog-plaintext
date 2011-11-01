@@ -44,13 +44,15 @@ E0 03 23 -- -- -- ...   2F 34 -- -- -- ...   3B
 
 jmp_buf nul;
 
+
+
 const unsigned char sections[][6] = {
  /* start_rec  */  { 0x6C, 0x33, 0x33, 0x6C, 0x0 },
  /* // skip 14 */
  /* start_chat */  { 0xE0, 0x03, 0x0 },
- /* start_mem1 */  { 0x23, 0x00 },
+ /* start_sender */  { 0x23, 0x00 },
  /* mem_sep    */  { 0x2F, 0x00 }, /* '/' */
- /* start_mem2 */  { 0x34, 0x00 },
+ /* start_recipients */  { 0x34, 0x00 },
  /* end_membs  */  { 0x3B, 0x00 },
  /* start_msg  */  { 0xFC, 0x03, 0x0 } /* 0x0 term */
 };
@@ -63,7 +65,7 @@ void die(const char *s)
 }
 
 
-char *memmem2(char *start, char *data, size_t len, int n)
+char *find_section(char *start, char *data, size_t len, int n)
 {
 	char *pos = (char*) memmem(start, len - (start - data),
 				sections[n],
@@ -75,7 +77,7 @@ char *memmem2(char *start, char *data, size_t len, int n)
 	return pos + strlen((const char *)sections[n]);
 }
 
-int fprocess(char *data, size_t len)
+int parse_data(char *data, size_t len)
 {
 	int ret = 0;
 	char *ptr;
@@ -85,29 +87,29 @@ int fprocess(char *data, size_t len)
 
 	if(!setjmp(nul))
 		do{
-			char *mem1, *mem2, *msg;
+			char *sender, *recipients, *msg;
 
-			ptr = memmem2(ptr, data, len, 0);
+			ptr = find_section(ptr, data, len, 0);
 			ptr += 14;
-			ptr = memmem2(ptr, data, len, 1);
-			ptr = memmem2(ptr, data, len, 2);
+			ptr = find_section(ptr, data, len, 1);
+			ptr = find_section(ptr, data, len, 2);
 			save = ptr;
-			ptr = memmem2(ptr, data, len, 3);
+			ptr = find_section(ptr, data, len, 3);
 			ptr[-1] = '\0';
-			mem1 = save;
+			sender = save;
 
-			ptr++; /* = memmem2(ptr - 1, data, len, 4); */
+			ptr++; /* = find_section(ptr - 1, data, len, 4); */
 			save = ptr;
-			ptr = memmem2(ptr, data, len, 5);
+			ptr = find_section(ptr, data, len, 5);
 			ptr[-1] = '\0';
-			mem2 = save;
+			recipients = save;
 
-			ptr = memmem2(ptr, data, len, 6);
+			ptr = find_section(ptr, data, len, 6);
 			save = ptr;
 			ptr = (char*) memchr(ptr, 0, len - (ptr - data));
 			msg = save;
 
-			printf("%s <-> %s: %s\n", mem1, mem2, msg);
+			printf("%s <-> %s: %s\n", sender, recipients, msg);
 		}while(1);
 	else
 		ret = 1;
@@ -115,7 +117,7 @@ int fprocess(char *data, size_t len)
 	return ret;
 }
 
-int process(const char *fname)
+int process_file(const char *fname)
 {
     int fd = open(fname, O_RDONLY);
     if (fd == -1)
@@ -135,13 +137,14 @@ int process(const char *fname)
     }
     
     
-	int ret = fprocess(static_cast<char *>(buf), filesize);
+	int ret = parse_data(static_cast<char *>(buf), filesize);
 
     munmap(buf, filesize);
     close(fd);
 
 	return ret;
 }
+
 
 int main(int argc, char **argv)
 {
@@ -161,7 +164,7 @@ int main(int argc, char **argv)
         ret = 1;
     }
     for(size_t i = 1; i < argc; i++)
-			ret |= process(argv[i]);
+			ret |= process_file(argv[i]);
 
 	return ret;
 }
