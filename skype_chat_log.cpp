@@ -53,11 +53,12 @@ enum {
     SEC_MEM_SEP,
     SEC_START_RECIPIENTS,
     SEC_END_MEMBS,
+    SEC_START_TIME,
     SEC_START_MSG,
     SEC_NUM_SECTIONS
 };
 
-const unsigned char sections[][6] = {
+const unsigned char sections[][SEC_NUM_SECTIONS] = {
  /* start_rec  */  { 0x6C, 0x33, 0x33, 0x6C, 0x0 },
  /* // skip 14 */
  /* start_chat */  { 0xE0, 0x03, 0x0 },
@@ -65,9 +66,24 @@ const unsigned char sections[][6] = {
  /* mem_sep    */  { 0x2F, 0x00 }, /* '/' */
  /* start_recipients */  { 0x34, 0x00 },
  /* end_membs  */  { 0x3B, 0x00 },
+ /* start_time */  { 0xE5,  0x03, 0x0},
  /* start_msg  */  { 0xFC, 0x03, 0x0 } /* 0x0 term */
 };
 
+
+time_t read_time(char* start)
+{
+    time_t t;
+    char *t_ptr = reinterpret_cast<char*>(&t);
+
+    // drop msb of every byte, join the remaining bits together
+    t_ptr[0] = ((start[1] << 7) & 0x80) | ((start[0] >> 0) & 0x7F);
+    t_ptr[1] = ((start[2] << 6) & 0xC0) | ((start[1] >> 1) & 0x3F);
+    t_ptr[2] = ((start[3] << 5) & 0xE0) | ((start[2] >> 2) & 0x1F);
+    t_ptr[3] = ((start[4] << 4) & 0xF0) | ((start[3] >> 3) & 0x0F);
+
+    return t;
+}
 
 
 char *find_section(char *start, char *data, size_t len, int n)
@@ -87,6 +103,9 @@ int parse_data(char *data, size_t len)
 	int ret = 0;
 	char *ptr;
 	char *save;
+	time_t time;
+#define TIMESTR_MAX 18
+	char timestr[TIMESTR_MAX];
 
 	ptr = data;
 
@@ -109,12 +128,17 @@ int parse_data(char *data, size_t len)
 			ptr[-1] = '\0';
 			recipients = save;
 
+			ptr = find_section(ptr, data, len, SEC_START_TIME);
+			time = read_time(ptr);
+			ptr += 6;
+
 			ptr = find_section(ptr, data, len, SEC_START_MSG);
 			save = ptr;
 			ptr = (char*) memchr(ptr, 0, len - (ptr - data));
 			msg = save;
 
-			printf("%s <-> %s: %s\n", sender, recipients, msg);
+			strftime(timestr, TIMESTR_MAX, "%Y-%m-%d.%H%M%S", localtime(&time));
+			printf("%s: %s <-> %s: %s\n", timestr, sender, recipients, msg);
 		}while(1);
 	else
 		ret = 1;
