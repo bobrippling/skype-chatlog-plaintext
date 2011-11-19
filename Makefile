@@ -1,7 +1,8 @@
-CXXFLAGS += -g -Wall -Wextra -pedantic
+CFLAGS += -g -Wall -Wextra -pedantic
 
-skype_chat_log: skype_chat_log.cpp
+skypelog: skypelog.c
 
 clean:
-	$(RM) *.o skype_chat_log
+	rm -f skypelog
 
+.PHONY: clean
