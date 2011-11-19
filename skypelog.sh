@@ -8,6 +8,6 @@ fi
 
 dir="$(dirname "$(readlink "$0" 2> /dev/null || echo "$0")")"
 
-# general sorted already, but just to be sure...
+# mostly sorted already, but in case the directory order is out...
 
 "$dir"/skypelog "$1" 2> /dev/null | sort
