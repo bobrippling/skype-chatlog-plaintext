@@ -23,6 +23,7 @@ enum
 	SEC_START_RECIPIENTS,
 	SEC_END_MEMBS,
 	SEC_START_TIME,
+	SEC_SENDER,
 	SEC_START_MSG,
 	SEC_NUM_SECTIONS
 };
@@ -36,6 +37,7 @@ static const unsigned char sections[][SEC_NUM_SECTIONS] = {
 	/* start_recipients */  { 0x34, 0x00 },
 	/* end_membs  */        { 0x3B, 0x00 },
 	/* start_time */        { 0xE5, 0x03, 0x0},
+	/* msg_sender */        { 0xE8, 0x03 },
 	/* start_msg  */        { 0xFC, 0x03, 0x0 }
 };
 
@@ -87,13 +89,16 @@ char *find_section(char *start, char *data, size_t len, int n)
 	return pos + strlen((const char *)sections[n]);
 }
 
-void output_chat(char *timestr, char *caller, char *recipients, char *chatid, char *msg)
+void output_chat(char *timestr, char *caller, char *recipients, char *sender, char *chatid, char *msg)
 {
 	/* check for newlines, output each separately, so skypelog.sh can parse and sort more easily */
 	char *tok;
+	
+	if (strcmp(caller, sender))
+		recipients = caller;
 
 	for(tok = strtok(msg, "\n"); tok; tok = strtok(NULL, "\n"))
-		printf("%s: %s: %s <-> %s: %s\n", timestr, chatid, caller, recipients, tok);
+		printf("%s: %s: %s -> %s: %s\n", timestr, chatid, sender, recipients, tok);
 }
 
 void parse_data(char *data, size_t len)
@@ -116,7 +121,7 @@ void parse_data(char *data, size_t len)
 	}while(0)
 
 	do{
-		char *caller, *recipients, *msg, *chatid;
+		char *caller, *recipients, *msg, *chatid, *sender;
 
 		FIND_SECTION(ptr, data, len, SEC_START_REC);
 		ptr += 14;
@@ -137,12 +142,15 @@ void parse_data(char *data, size_t len)
 		time = read_time(ptr);
 		ptr += 6;
 
+		FIND_SECTION(ptr, data, len, SEC_SENDER);
+
+		sender = ptr;
 		FIND_SECTION(ptr, data, len, SEC_START_MSG);
 		msg = ptr;
 		ptr = memchr(ptr, 0, len - (ptr - data));
 
 		strftime(timestr, sizeof timestr, "%Y-%m-%d.%H%M%S", localtime(&time));
-		output_chat(timestr, caller, recipients, chatid, msg);
+		output_chat(timestr, caller, recipients, sender, chatid, msg);
 	}while(1);
 }
 
