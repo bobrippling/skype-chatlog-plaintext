@@ -18,7 +18,7 @@ enum
 {
 	SEC_START_REC = 0,
 	SEC_START_CHAT,
-	SEC_START_SENDER,
+	SEC_START_CALLER,
 	SEC_MEM_SEP,
 	SEC_START_RECIPIENTS,
 	SEC_END_MEMBS,
@@ -31,7 +31,7 @@ static const unsigned char sections[][SEC_NUM_SECTIONS] = {
 	/* start_rec  */        { 0x6C, 0x33, 0x33, 0x6C, 0x0 },
 	/* skip 14    */
 	/* start_chat */        { 0xE0, 0x03, 0x0 },
-	/* start_sender */      { 0x23, 0x00 },
+	/* start_caller */      { 0x23, 0x00 },
 	/* mem_sep    */        { 0x2F, 0x00 }, /* '/' */
 	/* start_recipients */  { 0x34, 0x00 },
 	/* end_membs  */        { 0x3B, 0x00 },
@@ -87,13 +87,13 @@ char *find_section(char *start, char *data, size_t len, int n)
 	return pos + strlen((const char *)sections[n]);
 }
 
-void output_chat(char *timestr, char *sender, char *recipients, char *msg)
+void output_chat(char *timestr, char *caller, char *recipients, char *msg)
 {
 	/* check for newlines, output each separately, so skypelog.sh can parse and sort more easily */
 	char *tok;
 
 	for(tok = strtok(msg, "\n"); tok; tok = strtok(NULL, "\n"))
-		printf("%s: %s <-> %s: %s\n", timestr, sender, recipients, tok);
+		printf("%s: %s <-> %s: %s\n", timestr, caller, recipients, tok);
 }
 
 void parse_data(char *data, size_t len)
@@ -117,16 +117,16 @@ void parse_data(char *data, size_t len)
 	}while(0)
 
 	do{
-		char *sender, *recipients, *msg;
+		char *caller, *recipients, *msg;
 
 		FIND_SECTION(ptr, data, len, SEC_START_REC);
 		ptr += 14;
 		FIND_SECTION(ptr, data, len, SEC_START_CHAT);
-		FIND_SECTION(ptr, data, len, SEC_START_SENDER);
+		FIND_SECTION(ptr, data, len, SEC_START_CALLER);
 		save = ptr;
 		FIND_SECTION(ptr, data, len, SEC_MEM_SEP);
 		ptr[-1] = '\0';
-		sender = save;
+		caller = save;
 
 		ptr++; /* = FIND_SECTION(ptr - 1, data, len, 4); */
 		save = ptr;
@@ -144,7 +144,7 @@ void parse_data(char *data, size_t len)
 		msg = save;
 
 		strftime(timestr, sizeof timestr, "%Y-%m-%d.%H%M%S", localtime(&time));
-		output_chat(timestr, sender, recipients, msg);
+		output_chat(timestr, caller, recipients, msg);
 	}while(1);
 }
 
