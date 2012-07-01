@@ -23,24 +23,25 @@ enum
 	SEC_START_RECIPIENTS,
 	SEC_END_MEMBS,
 	SEC_START_TIME,
-	SEC_SENDER,
+	SEC_START_SENDER,
 	SEC_START_MSG,
 	SEC_NUM_SECTIONS
 };
 
 static const unsigned char sections[][SEC_NUM_SECTIONS] = {
-	/* start_rec  */        { 0x6C, 0x33, 0x33, 0x6C, 0x0 },
+	/* start_rec  */        { 0x6C, 0x33, 0x33, 0x6C, 0x00 },
 	/* skip 14    */
-	/* start_chat */        { 0xE0, 0x03, 0x0 },
+	/* start_chat */        { 0xE0, 0x03, 0x00 },
 	/* start_caller */      { 0x23, 0x00 },
 	/* mem_sep    */        { 0x2F, 0x00 }, /* '/' */
 	/* start_recipients */  { 0x34, 0x00 },
 	/* end_membs  */        { 0x3B, 0x00 },
-	/* start_time */        { 0xE5, 0x03, 0x0},
-	/* msg_sender */        { 0xE8, 0x03 },
-	/* start_msg  */        { 0xFC, 0x03, 0x0 }
+	/* start_time */        { 0xE5, 0x03, 0x00 },
+	/* msg_sender */        { 0xE8, 0x03, 0x00 },
+	/* start_msg  */        { 0xFC, 0x03, 0x00 }
 };
 
+static unsigned int MAX_DIST_TO_MSG = 50;
 
 static const char *prog;
 
@@ -121,9 +122,11 @@ void parse_data(char *data, size_t len)
 	}while(0)
 
 	do{
-		char *caller, *recipients, *msg, *chatid, *sender;
+		char *caller, *recipients, *msg, *chatid, *sender, *startsection;
 
 		FIND_SECTION(ptr, data, len, SEC_START_REC);
+		startsection = ptr;
+
 		ptr += 14;
 		FIND_SECTION(ptr, data, len, SEC_START_CHAT);
 		FIND_SECTION(ptr, data, len, SEC_START_CALLER);
@@ -142,10 +145,16 @@ void parse_data(char *data, size_t len)
 		time = read_time(ptr);
 		ptr += 6;
 
-		FIND_SECTION(ptr, data, len, SEC_SENDER);
-
+		FIND_SECTION(ptr, data, len, SEC_START_SENDER);
 		sender = ptr;
+
 		FIND_SECTION(ptr, data, len, SEC_START_MSG);
+
+		if ((ptr-sender) > MAX_DIST_TO_MSG) {
+			ptr = startsection + 1;
+			continue;
+		}
+
 		msg = ptr;
 		ptr = memchr(ptr, 0, len - (ptr - data));
 
