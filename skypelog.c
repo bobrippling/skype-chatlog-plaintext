@@ -101,7 +101,7 @@ void output_chat(char *timestr, char *caller, char *recipients, char *sender, ch
 		recipients = caller;
 
 	for(tok = strtok(msg, "\n"); tok; tok = strtok(NULL, "\n"))
-		printf("%s: %s: %s (%s) -> %s: %s\n", timestr, chatid, sender, sendername, recipients, tok);
+		printf("%s: [%s] %s (%s) -> %s: %s\n", timestr, chatid, sender, sendername, recipients, tok);
 }
 
 void parse_data(char *data, size_t len)
