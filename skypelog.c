@@ -106,7 +106,7 @@ void parse_data(char *data, size_t len)
 {
 	char *ptr;
 	time_t time;
-	char timestr[18];
+	char timestr[20];
 
 	ptr = data;
 
@@ -158,7 +158,7 @@ void parse_data(char *data, size_t len)
 		msg = ptr;
 		ptr = memchr(ptr, 0, len - (ptr - data));
 
-		strftime(timestr, sizeof timestr, "%Y-%m-%d.%H%M%S", localtime(&time));
+		strftime(timestr, sizeof timestr, "%Y-%m-%d.%H:%M:%S", localtime(&time));
 		output_chat(timestr, caller, recipients, sender, chatid, msg);
 	}while(1);
 }
