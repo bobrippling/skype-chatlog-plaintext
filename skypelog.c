@@ -25,6 +25,7 @@ enum
 	SEC_START_TIME,
 	SEC_START_SENDER,
 	SEC_START_MSG,
+	SEC_START_SENDERNAME,
 	SEC_NUM_SECTIONS
 };
 
@@ -38,7 +39,8 @@ static const unsigned char sections[][SEC_NUM_SECTIONS] = {
 	/* end_membs  */        { 0x3B, 0x00 },
 	/* start_time */        { 0xE5, 0x03, 0x00 },
 	/* msg_sender */        { 0xE8, 0x03, 0x00 },
-	/* start_msg  */        { 0xFC, 0x03, 0x00 }
+	/* start_msg  */        { 0xFC, 0x03, 0x00 },
+	/* sender name */       { 0x03, 0xEC, 0x03, 0x00 }
 };
 
 static unsigned int MAX_DIST_TO_MSG = 50;
@@ -90,7 +92,7 @@ char *find_section(char *start, char *data, size_t len, int n)
 	return pos + strlen((const char *)sections[n]);
 }
 
-void output_chat(char *timestr, char *caller, char *recipients, char *sender, char *chatid, char *msg)
+void output_chat(char *timestr, char *caller, char *recipients, char *sender, char *sendername, char *chatid, char *msg)
 {
 	/* check for newlines, output each separately, so skypelog.sh can parse and sort more easily */
 	char *tok;
@@ -99,7 +101,7 @@ void output_chat(char *timestr, char *caller, char *recipients, char *sender, ch
 		recipients = caller;
 
 	for(tok = strtok(msg, "\n"); tok; tok = strtok(NULL, "\n"))
-		printf("%s: %s: %s -> %s: %s\n", timestr, chatid, sender, recipients, tok);
+		printf("%s: %s: %s (%s) -> %s: %s\n", timestr, chatid, sender, sendername, recipients, tok);
 }
 
 void parse_data(char *data, size_t len)
@@ -122,7 +124,7 @@ void parse_data(char *data, size_t len)
 	}while(0)
 
 	do{
-		char *caller, *recipients, *msg, *chatid, *sender, *startsection;
+		char *caller, *recipients, *msg, *chatid, *sender, *sendername, *startsection;
 
 		FIND_SECTION(ptr, data, len, SEC_START_REC);
 		startsection = ptr;
@@ -157,9 +159,12 @@ void parse_data(char *data, size_t len)
 
 		msg = ptr;
 		ptr = memchr(ptr, 0, len - (ptr - data));
+		
+		FIND_SECTION(ptr, data, len, SEC_START_SENDERNAME);
+		sendername = ptr;
 
 		strftime(timestr, sizeof timestr, "%Y-%m-%d.%H:%M:%S", localtime(&time));
-		output_chat(timestr, caller, recipients, sender, chatid, msg);
+		output_chat(timestr, caller, recipients, sender, sendername, chatid, msg);
 	}while(1);
 }
 
