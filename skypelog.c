@@ -99,7 +99,6 @@ void output_chat(char *timestr, char *caller, char *recipients, char *msg)
 void parse_data(char *data, size_t len)
 {
 	char *ptr;
-	char *save;
 	time_t time;
 	char timestr[18];
 
@@ -123,25 +122,22 @@ void parse_data(char *data, size_t len)
 		ptr += 14;
 		FIND_SECTION(ptr, data, len, SEC_START_CHAT);
 		FIND_SECTION(ptr, data, len, SEC_START_CALLER);
-		save = ptr;
+		caller = ptr;
 		FIND_SECTION(ptr, data, len, SEC_MEM_SEP);
 		ptr[-1] = '\0';
-		caller = save;
 
 		ptr++; /* = FIND_SECTION(ptr - 1, data, len, 4); */
-		save = ptr;
+		recipients = ptr;
 		FIND_SECTION(ptr, data, len, SEC_END_MEMBS);
 		ptr[-1] = '\0';
-		recipients = save;
 
 		FIND_SECTION(ptr, data, len, SEC_START_TIME);
 		time = read_time(ptr);
 		ptr += 6;
 
 		FIND_SECTION(ptr, data, len, SEC_START_MSG);
-		save = ptr;
+		msg = ptr;
 		ptr = memchr(ptr, 0, len - (ptr - data));
-		msg = save;
 
 		strftime(timestr, sizeof timestr, "%Y-%m-%d.%H%M%S", localtime(&time));
 		output_chat(timestr, caller, recipients, msg);
