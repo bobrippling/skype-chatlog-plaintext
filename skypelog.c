@@ -152,6 +152,8 @@ void parse_data(char *data, size_t len)
 
 		FIND_SECTION(ptr, data, len, SEC_START_MSG);
 
+		/* To make sure we have not jumped to another record */
+		/* It would be safer to test for a "END_OF_RECORD" field */
 		if ((ptr-sender) > MAX_DIST_TO_MSG) {
 			ptr = startsection + 1;
 			continue;
