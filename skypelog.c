@@ -18,27 +18,32 @@ enum
 {
 	SEC_START_REC = 0,
 	SEC_START_CHAT,
-	SEC_START_SENDER,
+	SEC_START_CALLER,
 	SEC_MEM_SEP,
 	SEC_START_RECIPIENTS,
 	SEC_END_MEMBS,
 	SEC_START_TIME,
+	SEC_START_SENDER,
 	SEC_START_MSG,
+	SEC_START_SENDERNAME,
 	SEC_NUM_SECTIONS
 };
 
 static const unsigned char sections[][SEC_NUM_SECTIONS] = {
-	/* start_rec  */        { 0x6C, 0x33, 0x33, 0x6C, 0x0 },
+	/* start_rec  */        { 0x6C, 0x33, 0x33, 0x6C, 0x00 },
 	/* skip 14    */
-	/* start_chat */        { 0xE0, 0x03, 0x0 },
-	/* start_sender */      { 0x23, 0x00 },
+	/* start_chat */        { 0xE0, 0x03, 0x00 },
+	/* start_caller */      { 0x23, 0x00 },
 	/* mem_sep    */        { 0x2F, 0x00 }, /* '/' */
 	/* start_recipients */  { 0x34, 0x00 },
 	/* end_membs  */        { 0x3B, 0x00 },
-	/* start_time */        { 0xE5, 0x03, 0x0},
-	/* start_msg  */        { 0xFC, 0x03, 0x0 }
+	/* start_time */        { 0xE5, 0x03, 0x00 },
+	/* msg_sender */        { 0xE8, 0x03, 0x00 },
+	/* start_msg  */        { 0xFC, 0x03, 0x00 },
+	/* sender name */       { 0x03, 0xEC, 0x03, 0x00 }
 };
 
+static unsigned int MAX_DIST_TO_MSG = 50;
 
 static const char *prog;
 
@@ -87,21 +92,23 @@ char *find_section(char *start, char *data, size_t len, int n)
 	return pos + strlen((const char *)sections[n]);
 }
 
-void output_chat(char *timestr, char *sender, char *recipients, char *msg)
+void output_chat(char *timestr, char *caller, char *recipients, char *sender, char *sendername, char *chatid, char *msg)
 {
 	/* check for newlines, output each separately, so skypelog.sh can parse and sort more easily */
 	char *tok;
+	
+	if (strcmp(caller, sender))
+		recipients = caller;
 
 	for(tok = strtok(msg, "\n"); tok; tok = strtok(NULL, "\n"))
-		printf("%s: %s <-> %s: %s\n", timestr, sender, recipients, tok);
+		printf("%s: [%s] %s (%s) -> %s: %s\n", timestr, chatid, sender, sendername, recipients, tok);
 }
 
 void parse_data(char *data, size_t len)
 {
 	char *ptr;
-	char *save;
 	time_t time;
-	char timestr[18];
+	char timestr[20];
 
 	ptr = data;
 
@@ -117,34 +124,49 @@ void parse_data(char *data, size_t len)
 	}while(0)
 
 	do{
-		char *sender, *recipients, *msg;
+		char *caller, *recipients, *msg, *chatid, *sender, *sendername, *startsection;
 
 		FIND_SECTION(ptr, data, len, SEC_START_REC);
+		startsection = ptr;
+
 		ptr += 14;
 		FIND_SECTION(ptr, data, len, SEC_START_CHAT);
-		FIND_SECTION(ptr, data, len, SEC_START_SENDER);
-		save = ptr;
+		FIND_SECTION(ptr, data, len, SEC_START_CALLER);
+		caller = ptr;
 		FIND_SECTION(ptr, data, len, SEC_MEM_SEP);
 		ptr[-1] = '\0';
-		sender = save;
 
 		ptr++; /* = FIND_SECTION(ptr - 1, data, len, 4); */
-		save = ptr;
+		recipients = ptr;
 		FIND_SECTION(ptr, data, len, SEC_END_MEMBS);
 		ptr[-1] = '\0';
-		recipients = save;
 
+		chatid = ptr;
 		FIND_SECTION(ptr, data, len, SEC_START_TIME);
+		ptr[-1] = '\0';
 		time = read_time(ptr);
 		ptr += 6;
 
-		FIND_SECTION(ptr, data, len, SEC_START_MSG);
-		save = ptr;
-		ptr = memchr(ptr, 0, len - (ptr - data));
-		msg = save;
+		FIND_SECTION(ptr, data, len, SEC_START_SENDER);
+		sender = ptr;
 
-		strftime(timestr, sizeof timestr, "%Y-%m-%d.%H%M%S", localtime(&time));
-		output_chat(timestr, sender, recipients, msg);
+		FIND_SECTION(ptr, data, len, SEC_START_MSG);
+
+		/* To make sure we have not jumped to another record */
+		/* It would be safer to test for a "END_OF_RECORD" field */
+		if ((ptr-sender) > MAX_DIST_TO_MSG) {
+			ptr = startsection + 1;
+			continue;
+		}
+
+		msg = ptr;
+		ptr = memchr(ptr, 0, len - (ptr - data));
+		
+		FIND_SECTION(ptr, data, len, SEC_START_SENDERNAME);
+		sendername = ptr;
+
+		strftime(timestr, sizeof timestr, "%Y-%m-%d.%H:%M:%S", localtime(&time));
+		output_chat(timestr, caller, recipients, sender, sendername, chatid, msg);
 	}while(1);
 }
 
